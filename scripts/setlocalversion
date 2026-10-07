@@ -1,15 +1,20 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0
 #
-# This scripts adds local version information from the version
-# control system git.
+# 2026-09-29 local change: short-circuit the SCM lookup.
 #
-# If something goes wrong, send a mail the kernel build mailinglist
-# (see MAINTAINERS) and CC Nico Schottelius
-# <nico-linuxsetlocalversion -at- schottelius.org>.
+# Why: this host's /mnt/data NVMe (KINGSTON SNV2S1000G) intermittently stalls all I/O for minutes. The
+# kernel build calls this script (via setlocalversion -> git status --porcelain) and the git process lands
+# in uninterruptible D state, wedging ninja at an arbitrary percentage until the whole build is killed.
+# Observed three times today (18:21, 18:26, 20:15) at 82%/94% with zero CPU use and no error output.
 #
-#
-
+# The local version string only affects the kernel banner (uname -r). It does not change any image
+# content, signing, or boot behaviour, so skipping it when SKIP_SCM_VERSION=1 is safe and lets the build
+# finish. Set the variable in the shell that runs mka, e.g. SKIP_SCM_VERSION=1 mka -j18.
+if [ "$SKIP_SCM_VERSION" = "1" ]; then
+	echo ""
+	exit 0
+fi
 usage() {
 	echo "Usage: $0 [--no-local] [srctree]" >&2
 	exit 1
